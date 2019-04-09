@@ -5,10 +5,11 @@ import threading
 import time
 import random
 import threading
-
+import socket
+import pickle
 
 class Agent():
-    def __init__(self, agent_name, cpu, gpu, ram, storage, driver_cores, no_of_threads):
+    def __init__(self, id, agent_name, cpu, gpu, ram, storage, driver_cores, no_of_threads):
         self.agent_name = agent_name
         # self.cpu = threading.Semaphore(cpu)
         # self.gpu = threading.Semaphore(gpu)
@@ -16,6 +17,7 @@ class Agent():
         # self.storage = threading.Semaphore(storage)
         # self.driver_cores = threading.Semaphore(driver_cores)
         # self.no_of_threads = threading.Semaphore(no_of_threads)
+        self.id = id
         self.cpu = cpu
         self.gpu = gpu
         self.ram = ram
@@ -30,25 +32,30 @@ class Agent():
         return master_broadcast_received
         
 
-    def ready(self):
+    def ready(self, socket, conn):
 
         # Send resource statistics to master
         resources_available = self.get_available_resources()
-        self.send_update_to_master(resources_available)
+        self.send_update_to_master(socket, conn, resources_available)
 
-    def send_update_to_master(self, resources):
+    def send_update_to_master(self, socket, conn, resources):
         # print("Sending available resources=", resources, " to master." )
         # rpc communication here
-        pass
+        conn.sendall(pickle.dumps(resources))
 
-    def waiting_for_use(self):
+    def waiting_for_use(self, socket, conn):
         # If all resources used, go to busy
         # Wait for job object from master
         # incoming_job_received = RPC CALL FROM MASTER
-        incoming_job_received = [{"id" : 1, "cpu" : 2, "gpu" : 1, "storage" : 6, "ram" : 8}, {"id": 2,  "cpu" : 1, "gpu" : 1, "storage" : 10, "ram" : 2}]
-        idx = random.randint(0, 1)
-        if self.reduce_available_resources(incoming_job_received[idx]):
-            return incoming_job_received[idx]
+        #incoming_job_received = [{"id" : 1, "cpu" : 2, "gpu" : 1, "storage" : 6, "ram" : 8}, {"id": 2,  "cpu" : 1, "gpu" : 1, "storage" : 10, "ram" : 2}]
+        #idx = random.randint(0, 1)
+        data = conn.recv(1024)
+        incoming_job_received = pickle.loads(data)
+        print(incoming_job_received)
+        print("here")
+        if self.reduce_available_resources(incoming_job_received):
+            #print(self.get_available_resources())
+            return incoming_job_received
         else:
             return None
         # resources_available = self.get_available_resources()
@@ -59,7 +66,8 @@ class Agent():
 
         # return a dictionary
         resource_dict = {}
-        resource_dict["agent_name"] = self.agent_name
+        resource_dict["id"] = self.id
+        #resource_dict["agent_name"] = self.agent_name
         resource_dict["cpu"] = self.cpu
         resource_dict["gpu"] = self.gpu
         resource_dict["ram"] = self.ram
@@ -153,27 +161,41 @@ class Agent():
         print("Job executed")
         self.increase_available_resources(job)
 
-    def execute_agent(self, name):
+    def socket_setup(self, port):
+        host = '10.194.31.36'
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        s.bind((host, port))
+        s.listen()
+        conn, addr = s.accept()
+        print('Connected by', addr)
+        return s, conn
+
+    def execute_agent(self, name, socket, conn):
+        
         print(name + " ready")
-        self.ready()
+        self.ready(socket, conn)
         print(name + " waiting")
-        job = self.waiting_for_use()
+        job = self.waiting_for_use(socket, conn)
+        
         if job != None:
             print(name + " executing")
             self.execute_job(job)
             print(name + " executed")
         else:
             print(name + " error. Not enough resources")
-
+    
     def run(self):
-        ready = self.idle()
-        while ready:
-            t1 = threading.Thread(target=self.execute_agent, args=("Thread 1", ))
-            t2 = threading.Thread(target=self.execute_agent, args=("Thread 2", ))
+        socket, conn = self.socket_setup(8000)
+        while True:
+            t1 = threading.Thread(target=self.execute_agent, args=("Thread 1", socket, conn))
+            t2 = threading.Thread(target=self.execute_agent, args=("Thread 2", socket, conn))
             t1.start()
             t2.start()
             t1.join()
             t2.join()
+        conn.close()
+        socket.close()
             
 
 
@@ -188,7 +210,7 @@ def main():
     storage = 2048 #GB
     driver_cores = 2
     no_of_threads = 4
-    agent = Agent(agent_name, cpu, gpu, ram, storage, driver_cores, no_of_threads)
+    agent = Agent(1, agent_name, cpu, gpu, ram, storage, driver_cores, no_of_threads)
     agent.run()
 
 if __name__ == '__main__':
