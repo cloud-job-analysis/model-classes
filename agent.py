@@ -17,6 +17,8 @@ class Agent():
         # self.storage = threading.Semaphore(storage)
         # self.driver_cores = threading.Semaphore(driver_cores)
         # self.no_of_threads = threading.Semaphore(no_of_threads)
+        self.job_ids_lock = threading.Semaphore(1)
+        self.job_ids = []
         self.id = id
         self.cpu = cpu
         self.gpu = gpu
@@ -47,17 +49,24 @@ class Agent():
         # If all resources used, go to busy
         # Wait for job object from master
         # incoming_job_received = RPC CALL FROM MASTER
-        #incoming_job_received = [{"id" : 1, "cpu" : 2, "gpu" : 1, "storage" : 6, "ram" : 8}, {"id": 2,  "cpu" : 1, "gpu" : 1, "storage" : 10, "ram" : 2}]
-        #idx = random.randint(0, 1)
-        data = conn.recv(1024)
-        incoming_job_received = pickle.loads(data)
-        print(incoming_job_received)
-        print("here")
-        if self.reduce_available_resources(incoming_job_received):
-            #print(self.get_available_resources())
-            return incoming_job_received
-        else:
-            return None
+        # incoming_job_received = [{"id" : 1, "cpu" : 2, "gpu" : 1, "storage" : 6, "ram" : 8}, {"id": 2,  "cpu" : 1, "gpu" : 1, "storage" : 10, "ram" : 2}]
+        # idx = random.randint(0, 1)
+        while True:
+            data = conn.recv(1024)
+            incoming_job_received = pickle.loads(data)
+            #print(incoming_job_received)
+            if self.job_ids_lock.acquire():
+                if incoming_job_received["id"] in self.job_ids:
+                    self.job_ids_lock.release()
+                    continue
+                if self.reduce_available_resources(incoming_job_received):
+                    self.job_ids.append(incoming_job_received["id"])
+                    self.job_ids_lock.release()
+                    self.ready(socket, conn)
+                    return incoming_job_received
+                else:
+                    print("false", incoming_job_received)
+                    return None
         # resources_available = self.get_available_resources()
         # send_update_to_master(resources_available)
         # if all resources used up, go to busy
@@ -138,23 +147,17 @@ class Agent():
         return True
 
     def increase_available_resources(self, incoming_job_received):
-        self.cpu += incoming_job_received["cpu"]
-        self.gpu += incoming_job_received["gpu"]
-        self.ram += incoming_job_received["ram"]
-        self.storage += incoming_job_received["storage"]
-        try:
-            self.driver_cores += incoming_job_received["driver_cores"]
-        except KeyError:
-            pass
-        try:
-            self.no_of_threads += incoming_job_received["no_of_threads"]
-        except KeyError:
-            pass
-        print("Resources added back")
+        self.cpu += incoming_job_received.get("cpu", 0)
+        self.gpu += incoming_job_received.get("gpu", 0)
+        self.ram += incoming_job_received.get("ram", 0)
+        self.storage += incoming_job_received.get("storage", 0)
+        self.driver_cores += incoming_job_received.get("driver_cores", 0)
+        self.no_of_threads += incoming_job_received.get("no_of_threads", 0)
+        print("Resources added back", self.get_available_resources())
 
     def execute_job(self, job):
         print("Running job")
-        print(job)
+        print(job, self.get_available_resources())
         #print(time.time())
         time.sleep(5)
         #print(time.time())
@@ -183,11 +186,14 @@ class Agent():
             self.execute_job(job)
             print(name + " executed")
         else:
+            print("Not Running job")
+            print(self.get_available_resources())
             print(name + " error. Not enough resources")
     
     def run(self):
         socket, conn = self.socket_setup(8000)
         while True:
+            # TODO: Increase number of threads dynamically
             t1 = threading.Thread(target=self.execute_agent, args=("Thread 1", socket, conn))
             t2 = threading.Thread(target=self.execute_agent, args=("Thread 2", socket, conn))
             t1.start()
