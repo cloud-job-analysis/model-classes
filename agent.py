@@ -7,6 +7,7 @@ import random
 import threading
 import socket
 import pickle
+import subprocess
 from multiprocessing import Process
 
 class Agent():
@@ -21,7 +22,9 @@ class Agent():
         self.resource_lock = threading.Semaphore(1)
         #self.ram_lock = threading.Semaphore(1)
         self.conn_lock = threading.Semaphore(1)
+        self.is_flask_running_lock = threading.Semaphore(1)
         self.job_ids_lock = threading.Semaphore(1)
+        self.is_flask_running = False
         self.job_ids = {}
         self.id = id
         self.cpu = cpu
@@ -192,6 +195,29 @@ class Agent():
         print("Running job", job, self.get_available_resources())
         #print(time.time())
         time.sleep(5)
+        
+        # if job["type"] == "flask_server" and self.is_flask_running:
+        #     print("Server already running")
+        #     self.increase_available_resources(job)
+        #     update_to_master = job
+        #     #del update_to_master["id"]
+        #     update_to_master["agent_id"] = self.id
+        #     self.send_update_to_master(socket, conn, update_to_master)
+        #     self.is_flask_running_lock.release()
+        #     return
+        # elif job["type"] == "flask_server":
+        #     self.is_flask_running = True
+        if job["type"] == 'flask_job':
+            self.is_flask_running_lock.acquire()
+            if not self.is_flask_running:
+                print("wait for server", self.is_flask_running, job["type"])
+                server = "python /home/avais/Desktop/cloud/frameworks-flask/app.py"
+                #threading.Thread(target=subprocess.call, args=(server, True), daemon=True).start()
+                subprocess.Popen(server, shell=True)
+                self.is_flask_running = True
+                time.sleep(2)
+            self.is_flask_running_lock.release()
+        subprocess.call(job["command"], shell=True)
         #print(time.time())
         print("Job executed", job)
         self.increase_available_resources(job)
@@ -201,7 +227,7 @@ class Agent():
         self.send_update_to_master(socket, conn, update_to_master)
 
     def socket_setup(self, port):
-        host = '10.194.31.36'
+        host = '10.194.80.70'
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         s.bind((host, port))
@@ -218,10 +244,10 @@ class Agent():
             print("check", self.get_available_resources())
             job = self.waiting_for_use(socket, conn)
             if job != None:
-                print("if statement chck", job)
+                print("if statement chck", job)    
                 threading.Thread(target=self.execute_job, args=(job, socket, conn), daemon=True).start()
                 #thread.start()
-                print("Executed thread?")
+                #print("Executed thread?")
                 #thread.run()
                 job = None
                 #print(name + " executed")
