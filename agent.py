@@ -23,8 +23,10 @@ class Agent():
         #self.ram_lock = threading.Semaphore(1)
         self.conn_lock = threading.Semaphore(1)
         self.is_flask_running_lock = threading.Semaphore(1)
+        self.is_hadoop_running_lock = threading.Semaphore(1)
         self.job_ids_lock = threading.Semaphore(1)
         self.is_flask_running = False
+        self.is_hadoop_running = False
         self.job_ids = {}
         self.id = id
         self.cpu = cpu
@@ -194,6 +196,7 @@ class Agent():
     def execute_job(self, job, socket, conn):
         #print("Running job", job, self.get_available_resources())
         ##print(time.time())
+
         time.sleep(5)
 
         start = time.time()
@@ -219,7 +222,16 @@ class Agent():
                 self.is_flask_running = True
                 time.sleep(2)
             self.is_flask_running_lock.release()
+        if job["type"] == "mr_job":
+            self.is_hadoop_running_lock.acquire()
+            if not self.is_hadoop_running:
+                print("starting hadoop", self.is_hadoop_running, job["type"])
+                dfs = "/usr/local/hadoop/sbin/start-dfs.sh"
+                subprocess.call(dfs, shell=True)
+                self.is_hadoop_running = True
+            self.is_hadoop_running_lock.release()
         subprocess.call(job["command"], shell=True)
+
         ##print(time.time())
         #print("Job executed", job)
         self.increase_available_resources(job)
