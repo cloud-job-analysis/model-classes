@@ -48,9 +48,9 @@ class Agent():
         self.send_update_to_master(socket, conn, resources_available)
 
     def send_update_to_master(self, socket, conn, resources):
-        # print("Sending available resources=", resources, " to master." )
+        # #print("Sending available resources=", resources, " to master." )
         # rpc communication here
-        print("Sending to master")
+        #print("Sending to master")
         conn.sendall(pickle.dumps(resources))
 
     def waiting_for_use(self, socket, conn):
@@ -64,7 +64,7 @@ class Agent():
         #     data = conn.recv(1024)
         #         #self.conn_lock.release()
         #     incoming_job_received = pickle.loads(data)
-        #     #print(incoming_job_received)
+        #     ##print(incoming_job_received)
         #     if self.job_ids_lock.acquire():
         #         if incoming_job_received["id"] in self.job_ids:
         #             self.job_ids_lock.release()
@@ -72,24 +72,24 @@ class Agent():
         #         if self.reduce_available_resources(incoming_job_received):
         #             self.job_ids[incoming_job_received["id"]] = name
         #             self.job_ids_lock.release()
-        #             print("ids", self.job_ids)
+        #             #print("ids", self.job_ids)
         #             #self.ready(socket, conn)
         #             #conn.sendall(pickle.dumps({"id": incoming_job_received["id"]}))
-        #             #print(incoming_job_received["id"])
+        #             ##print(incoming_job_received["id"])
         #             return incoming_job_received
         #         else:
-        #             print("false", incoming_job_received)
+        #             #print("false", incoming_job_received)
         #             return None
         # resources_available = self.get_available_resources()
         # send_update_to_master(resources_available)
         # if all resources used up, go to busy
-        print("waiting")
+        #print("waiting")
         data = conn.recv(1024)
         incoming_job_received = pickle.loads(data)
         if self.reduce_available_resources(incoming_job_received):
             return incoming_job_received
         else:
-            print("Cant execute:", incoming_job_received)
+            #print("Cant execute:", incoming_job_received)
             return None
         
 
@@ -125,35 +125,35 @@ class Agent():
         if "cpu" in incoming_job_received:
             if incoming_job_received["cpu"] > new_cpu:
                 # Return Error stating not enough CPU available
-                print("cpu limit exceeded")
+                #print("cpu limit exceeded")
                 return False
             else:
                 new_cpu -= incoming_job_received["cpu"]
         if "gpu" in incoming_job_received:  
             if incoming_job_received["gpu"] > self.gpu:
                 # Return Error stating not enough GPU available
-                print("gpu limit exceeded")
+                #print("gpu limit exceeded")
                 return False
             else:
                 new_gpu -= incoming_job_received["gpu"]
         if "ram" in incoming_job_received:
             if incoming_job_received["ram"] > new_ram:
                 # Return Error stating not enough RAM available
-                print("ram limit exceeded")
+                #print("ram limit exceeded")
                 return False
             else:
                 new_ram -= incoming_job_received["ram"]
         if "storage" in incoming_job_received:
             if incoming_job_received["storage"] > self.storage:
                 # Return Error stating not enough Storage available
-                print("storage limit exceeded")
+                #print("storage limit exceeded")
                 return False
             else:
                 new_storage -= incoming_job_received["storage"]
         if "driver_cores" in incoming_job_received:
             if incoming_job_received["driver_cores"] > self.driver_cores:
                 # Return Error stating not enough Driver cores available
-                print("driver cores limit exceeded")
+                #print("driver cores limit exceeded")
                 return False
             else:
                 new_driver_cores -= incoming_job_received["driver_cores"]
@@ -161,11 +161,11 @@ class Agent():
         if "no_of_threads" in incoming_job_received:
             if incoming_job_received["no_of_threads"] > self.no_of_threads:
                 # Return Error stating not enough Driver cores available
-                print("threads limit exceeded")
+                #print("threads limit exceeded")
                 return False
             else:
                 new_no_of_threads -= incoming_job_received["no_of_threads"]
-        #print("Resources reduced")
+        ##print("Resources reduced")
         self.resource_lock.acquire()
         self.cpu = new_cpu
         #self.cpu_lock.release()
@@ -189,15 +189,17 @@ class Agent():
         self.driver_cores += incoming_job_received.get("driver_cores", 0)
         self.no_of_threads += incoming_job_received.get("no_of_threads", 0)
         self.resource_lock.release()
-        print("Resources added back", self.get_available_resources(), incoming_job_received["id"])
+        #print("Resources added back", self.get_available_resources(), incoming_job_received["id"])
 
     def execute_job(self, job, socket, conn):
-        print("Running job", job, self.get_available_resources())
-        #print(time.time())
+        #print("Running job", job, self.get_available_resources())
+        ##print(time.time())
         time.sleep(5)
+
+        start = time.time()
         
         # if job["type"] == "flask_server" and self.is_flask_running:
-        #     print("Server already running")
+        #     #print("Server already running")
         #     self.increase_available_resources(job)
         #     update_to_master = job
         #     #del update_to_master["id"]
@@ -210,52 +212,54 @@ class Agent():
         if job["type"] == 'flask_job':
             self.is_flask_running_lock.acquire()
             if not self.is_flask_running:
-                print("wait for server", self.is_flask_running, job["type"])
-                server = "python /home/avais/Desktop/cloud/frameworks-flask/app.py"
+                #print("wait for server", self.is_flask_running, job["type"])
+                server = "python ../flask-server/app.py"
                 #threading.Thread(target=subprocess.call, args=(server, True), daemon=True).start()
                 subprocess.Popen(server, shell=True)
                 self.is_flask_running = True
                 time.sleep(2)
             self.is_flask_running_lock.release()
         subprocess.call(job["command"], shell=True)
-        #print(time.time())
-        print("Job executed", job)
+        ##print(time.time())
+        #print("Job executed", job)
         self.increase_available_resources(job)
         update_to_master = job
         #del update_to_master["id"]
         update_to_master["agent_id"] = self.id
+        update_to_master["job_runtime"] = time.time() - start
         self.send_update_to_master(socket, conn, update_to_master)
 
     def socket_setup(self, port):
-        host = '10.194.80.70'
+        host = '10.194.77.66'
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         s.bind((host, port))
         s.listen()
         conn, addr = s.accept()
-        print('Connected by', addr)
+        #print('Connected by', addr)
         return s, conn
 
     def execute_agent(self, socket, conn):
         
-        #print(name" ready")
-        #print(name + " waiting")
+        ##print(name" ready")
+        ##print(name + " waiting")
         while True:
-            print("check", self.get_available_resources())
+            #print("check", self.get_available_resources())
             job = self.waiting_for_use(socket, conn)
             if job != None:
-                print("if statement chck", job)    
+                #print("if statement chck", job)    
                 threading.Thread(target=self.execute_job, args=(job, socket, conn), daemon=True).start()
                 #thread.start()
-                #print("Executed thread?")
+                ##print("Executed thread?")
                 #thread.run()
                 job = None
-                #print(name + " executed")
+                ##print(name + " executed")
         
             else:
-                print("Not Running job")
-                print(self.get_available_resources())
-                print("Not enough resources")
+                #print("Not Running job")
+                #print(self.get_available_resources())
+                #print("Not enough resources")
+                pass
     
     def run(self):
         socket, conn = self.socket_setup(8000)
@@ -264,7 +268,7 @@ class Agent():
         # 	self.ready(socket, conn)
         # 	data = conn.recv(1024)
         	# incoming_job_received = pickle.loads(data)
-        	# print(incoming_job_received)
+        	# #print(incoming_job_received)
         self.execute_agent(socket, conn)
         #while True:
             # TODO: Increase number of threads dynamically
@@ -276,10 +280,6 @@ class Agent():
             #t2.join()
         conn.close()
         socket.close()
-            
-
-
-
 
 def main():
     # get resources available in agent machine and comment out next initialization lines
