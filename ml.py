@@ -1,4 +1,3 @@
-import time
 from sklearn.datasets import load_iris
 from sklearn.datasets import load_digits
 from sklearn.datasets import load_wine
@@ -11,8 +10,6 @@ parser = argparse.ArgumentParser(description='Get training data')
 parser.add_argument('--dataset', help='dataset name')
 
 args = parser.parse_args()
-
-dataset = args.dataset
 
 def load_data(dataset):
 	if dataset == 'iris':
@@ -27,7 +24,5 @@ def load_data(dataset):
 		raise ValueError
 
 X, y  = load_data(args.dataset)
-print(X.shape)
-print(y.shape)
 clf = SVC()
 clf.fit(X, y)
