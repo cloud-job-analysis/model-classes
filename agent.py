@@ -216,7 +216,7 @@ class Agent():
             self.is_flask_running_lock.acquire()
             if not self.is_flask_running:
                 #print("wait for server", self.is_flask_running, job["type"])
-                server = "python ../flask-server/app.py"
+                server = "python flask/app.py"
                 #threading.Thread(target=subprocess.call, args=(server, True), daemon=True).start()
                 subprocess.Popen(server, shell=True)
                 self.is_flask_running = True
@@ -242,7 +242,7 @@ class Agent():
         self.send_update_to_master(socket, conn, update_to_master)
 
     def socket_setup(self, port):
-        host = '10.194.77.66'
+        host = '10.194.80.70'
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         s.bind((host, port))
