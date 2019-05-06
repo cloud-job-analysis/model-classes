@@ -24,5 +24,6 @@ def load_data(dataset):
 		raise ValueError
 
 X, y  = load_data(args.dataset)
+print(X.shape, y.shape, args.dataset)
 clf = SVC()
 clf.fit(X, y)

@@ -296,9 +296,9 @@ class Agent():
 def main():
     # get resources available in agent machine and comment out next initialization lines
     agent_name = "1"
-    cpu = 4
+    cpu = 29
     gpu = 2
-    ram = 32 #GB
+    ram = 85 #GB
     storage = 2048 #GB
     driver_cores = 2
     no_of_threads = 4
