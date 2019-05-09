@@ -1,4 +1,4 @@
-# ./app.py
+#!/usr/bin/env python
 
 from flask import Flask, render_template, request, jsonify
 from random import *
