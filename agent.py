@@ -114,6 +114,7 @@ class Agent():
         self.cpu = new_cpu
         self.gpu = new_gpu
         self.ram = new_ram
+        self.user_id = incoming_job_received["user_id"]
         self.resource_lock.release()
         self.storage = new_storage
         self.driver_cores = new_driver_cores
