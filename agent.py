@@ -178,9 +178,12 @@ class Agent():
     def run(self):
         socket, conn = self.socket_setup(8000)
         self.ready(socket, conn)
-        self.execute_agent(socket, conn)
-        conn.close()
-        socket.close()
+        try:
+            self.execute_agent(socket, conn)
+        except EOFError as e:
+            print("Executed all jobs")
+            conn.close()
+            socket.close()
 
 
 def main():
